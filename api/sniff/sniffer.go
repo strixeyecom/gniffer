@@ -25,6 +25,7 @@ func New(cfg Cfg) Sniffer {
 
 type Cfg struct {
 	InterfaceName string `json:"interface_name" mapstructure:"INTERFACE_NAME"`
+	Filter        string `json:"filter" mapstructure:"FILTER"`
 }
 
 type ProxyCfg struct {
