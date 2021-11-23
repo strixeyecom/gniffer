@@ -76,6 +76,8 @@ dependencies can be found in go modules file.
 
 * [Cobra](https://github.com/spf13/cobra)
 * [Viper](https://github.com/spf13/viper)
+* [gopacket](https://github.com/google/gopacket)
+* [libpcap] (https://www.tcpdump.org/)
 
 <!-- GETTING STARTED -->
 
@@ -83,12 +85,25 @@ dependencies can be found in go modules file.
 
 General information about setting up gniffer locally
 
-### Prerequisites
+### Requirements
 
 Required software and installations.
 
-* gniffer has no external dependencies. It will work on all machines with supported operating systems and cpu
-  architectures.
+* libpcap v1.10.0 or higher
+* flex
+* bison
+* gcc
+
+Install flex and bison via your package manager.Then, to install libpcap, run the following script, preferably as root:
+
+```shell
+wget -O libpcap-1.10.0.tar.gz http://www.tcpdump.org/release/libpcap-1.10.0.tar.gz
+tar -xf libpcap-1.10.0.tar.gz
+cd libpcap-1.10.0
+./configure
+make && make install
+ldconfig
+```
 
 ### Installation
 
