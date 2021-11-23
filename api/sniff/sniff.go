@@ -20,8 +20,6 @@ import (
 type sniffer struct {
 	assembler *tcpassembly.Assembler
 	factory   *httpStreamFactory
-	// can support vxlan and tcp, or just tcp
-	filter string
 	// config contains sniffing related configuration
 	config Cfg
 	// handler functions to process the http requests
@@ -57,8 +55,8 @@ func (s *sniffer) Run(ctx context.Context) error {
 		return err
 	}
 	
-	if err := handle.SetBPFFilter(s.filter); err != nil {
-		return errors.WithMessage(err, "failed to set bpf filter")
+	if err := handle.SetBPFFilter(s.config.Filter); err != nil {
+		return errors.WithMessagef(err, "failed to set bpf filter \"%s\"",s.config.Filter)
 	}
 	
 	defer handle.Close()

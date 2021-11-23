@@ -46,6 +46,8 @@ func init() {
 	// and all subcommands, e.g.:
 	sniffCmd.PersistentFlags().StringP("interface", "i", "lo", "which interface to sniff")
 	err := viper.BindPFlag("INTERFACE_NAME", sniffCmd.PersistentFlags().Lookup("interface"))
+	sniffCmd.PersistentFlags().StringP("filter", "f", "lo", "which bpf filter")
+	err = viper.BindPFlag("FILTER", sniffCmd.PersistentFlags().Lookup("filter"))
 	if err != nil {
 		panic(err)
 	}
