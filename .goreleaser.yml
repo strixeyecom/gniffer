@@ -1,0 +1,65 @@
+# This is an example .goreleaser.yml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+    # you may remove this if you don't need go generate
+    - go generate ./...
+builds:
+  - env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+    ldflags:
+      - "-extldflags=-static -s -w -linkmode external"
+archives:
+  - replacements:
+      linux: Linux
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+dockers:
+  # You can have multiple Docker images.
+  - # GOOS of the built binaries/packages that should be used.
+    goos: linux
+
+    # GOARCH of the built binaries/packages that should be used.
+    goarch: amd64
+    # Templates of the Docker image names.
+    image_templates:
+      - "{{ .Env.DOCKER_REGISTRY }}/{{ .ProjectName }}:latest"
+      - "{{ .Env.DOCKER_REGISTRY }}/{{ .ProjectName }}:{{ .Tag }}"
+      - "{{ .Env.DOCKER_REGISTRY }}/{{ .ProjectName }}:{{ .Tag }}-{{ .ShortCommit }}"
+      - "{{ .Env.DOCKER_REGISTRY }}/{{ .ProjectName }}:v{{ .Major }}"
+      - "{{ .Env.DOCKER_REGISTRY }}/{{ .ProjectName }}:latest"
+
+    # Skips the docker push. Could be useful if you also do draft releases.
+    # If set to auto, the release will not be pushed to the docker repository
+    # in case there is an indicator for pre release in the tag e.g. v1.0.0-rc1
+    # Defaults to false.
+    skip_push: false
+
+    # Path to the Dockerfile (from the project root).
+    dockerfile: Dockerfile
+
+    # Whether to use `docker buildx build` instead of `docker build`.
+    # You probably want to set it to true when using flags like `--platform`.
+    # If true, will also add `--load` to the build flags.
+    # Defaults to false.
+    use_buildx: false
+
+    # Template of the docker build flags.
+    build_flag_templates:
+      - "--pull"
+      - "--platform=linux/amd64"
