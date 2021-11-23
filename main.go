@@ -15,7 +15,9 @@ limitations under the License.
 */
 package main
 
-import "github.com/strixeyecom/gniffer/cmd"
+import (
+	`github.com/strixeyecom/gniffer/cmd`
+)
 
 func main() {
 	cmd.Execute()
