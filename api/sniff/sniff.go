@@ -2,7 +2,6 @@ package sniff
 
 import (
 	`context`
-	`log`
 	`net/http`
 	`time`
 	
@@ -94,17 +93,14 @@ func (s *sniffer) sniffInterface(
 		case packet := <-packets:
 			// A nil packet indicates the end of a pcap file.
 			if packet == nil {
-				log.Println(errors.New("nil packet received"))
 				continue
 			}
 			
 			// check if the packet is OK
 			if packet.NetworkLayer() == nil {
-				log.Println(errors.New("nil network layer received"))
 				continue
 			}
 			if packet.TransportLayer() == nil {
-				log.Println(errors.New("nil transport layer received"))
 				continue
 			}
 			
