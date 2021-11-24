@@ -19,6 +19,7 @@ limitations under the License.
 import (
 	`bytes`
 	`context`
+	`fmt`
 	`io/ioutil`
 	`log`
 	`net/http`
@@ -35,19 +36,13 @@ var proxyCmd = &cobra.Command{
 	Long: `proxy command copies the sniffed request and sends to given target server,
 without changing the host headers`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var snifferCfg sniff.Cfg
-		err := viper.Unmarshal(&snifferCfg)
-		if err != nil {
-			return err
-		}
-		
 		var proxyCfg sniff.ProxyCfg
-		err = viper.Unmarshal(&proxyCfg)
+		err := viper.Unmarshal(&proxyCfg)
 		if err != nil {
 			return err
 		}
 		
-		sniffer := sniff.New(snifferCfg)
+		sniffer := sniff.New(proxyCfg.Cfg)
 		sniffingCtx, cancelSniffing := context.WithCancel(context.Background())
 		defer cancelSniffing()
 		
@@ -55,6 +50,12 @@ without changing the host headers`,
 		// add logging handler
 		err = sniffer.AddHandler(
 			func(ctx context.Context, req *http.Request) error {
+				if proxyCfg.HTTPFilter != nil {
+					if !proxyCfg.HTTPFilter.Match(req) {
+						return nil
+					}
+				}
+				
 				dupReq := req.Clone(ctx)
 				// modify request so that it goes to the target server but still has the original headers
 				dupReq.URL.Scheme = proxyCfg.TargetProtocol
@@ -74,6 +75,12 @@ without changing the host headers`,
 				}
 				return nil
 			},
+		)
+		
+		fmt.Printf(
+			"proxying %s requests to %s://%s:%s", proxyCfg.Cfg.InterfaceName, proxyCfg.TargetProtocol,
+			proxyCfg.TargetHost,
+			proxyCfg.TargetPort,
 		)
 		
 		if err := sniffer.Run(sniffingCtx); err != nil {
@@ -105,6 +112,20 @@ func init() {
 	err = viper.BindPFlag("TARGET_PROTOCOL", proxyCmd.PersistentFlags().Lookup("target-protocol"))
 	if err != nil {
 		log.Fatal(err)
+	}
+	proxyCmd.PersistentFlags().String("app-filter-hostname", "", "which hostnames should be proxied")
+	err = viper.BindPFlag("HTTP_FILTER.HOSTNAME", proxyCmd.PersistentFlags().Lookup("app-filter-hostname"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	sniffCmd.PersistentFlags().StringP("interface", "i", "lo", "which interface to sniff")
+	err = viper.BindPFlag("CFG.INTERFACE_NAME", sniffCmd.PersistentFlags().Lookup("interface"))
+	
+	sniffCmd.PersistentFlags().StringP("bpf-filter", "f", "", "custom bpf filter")
+	err = viper.BindPFlag("CFG.FILTER", sniffCmd.PersistentFlags().Lookup("bpf-filter"))
+	if err != nil {
+		panic(err)
 	}
 	
 }

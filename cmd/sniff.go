@@ -19,7 +19,6 @@ import (
 	"fmt"
 	
 	"github.com/spf13/cobra"
-	`github.com/spf13/viper`
 )
 
 // sniffCmd represents the sniff command
@@ -44,13 +43,6 @@ func init() {
 	
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	sniffCmd.PersistentFlags().StringP("interface", "i", "lo", "which interface to sniff")
-	err := viper.BindPFlag("INTERFACE_NAME", sniffCmd.PersistentFlags().Lookup("interface"))
-	sniffCmd.PersistentFlags().StringP("filter", "f", "", "custom bpf filter")
-	err = viper.BindPFlag("FILTER", sniffCmd.PersistentFlags().Lookup("filter"))
-	if err != nil {
-		panic(err)
-	}
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// sniffCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")

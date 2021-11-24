@@ -24,15 +24,40 @@ func New(cfg Cfg) Sniffer {
 }
 
 type Cfg struct {
+	// InterfaceName is the name of the network interface to sniff on. For now,
+	// only single interface per instance is supported.
 	InterfaceName string `json:"interface_name" mapstructure:"INTERFACE_NAME"`
-	Filter        string `json:"filter" mapstructure:"FILTER"`
+	// Filter is bpf filter to apply to the sniffing interface. In this case,
+	// most common filter is to set it to "tcp" to sniff only TCP traffic.
+	// or filter only requested host and ports on the machine
+	// "tcp and port 80 and host omer.beer
+	Filter string `json:"filter" mapstructure:"FILTER"`
 }
 
 type ProxyCfg struct {
+	// Cfg is the configuration for the gniffer application.
+	Cfg Cfg `json:"cfg" mapstructure:"CFG"`
 	// TargetProtocol http or https
 	TargetProtocol string `json:"target_protocol" mapstructure:"TARGET_PROTOCOL"`
 	// TargetHost should be a valid hostname
 	TargetHost string `json:"target_host" mapstructure:"TARGET_HOST"`
 	// TargetPort should be a valid port
 	TargetPort string `json:"target_port" mapstructure:"TARGET_PORT"`
+	// 	HTTPFilter supports filtering of http requests. In Cfg, the filter works at the network layer,
+	// 	this is the filter applied to the application layer.
+	HTTPFilter *HTTPFilter `json:"http_filter" mapstructure:"HTTP_FILTER"`
+}
+
+// 	HTTPFilter supports filtering of http requests. In Cfg, the filter works at the network layer,
+// 	this is the filter applied to the application layer.
+type HTTPFilter struct {
+	Hostname string `json:"server_host" mapstructure:"HOSTNAME"`
+}
+
+func (f HTTPFilter) Match(req *http.Request) bool {
+	if f.Hostname != "" && f.Hostname != req.Host {
+		return false
+	}
+	
+	return true
 }
