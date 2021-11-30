@@ -23,6 +23,7 @@ libpcap:
 build: initialize
 	CGO_ENABLED=1 \
  	GOOS=linux go build \
+ 	-ldflags="-extldflags=-static -s -w" \
 	-a -o gniffer  main.go
 
 build-standalone:

@@ -1,15 +1,15 @@
 package sniff
 
 import (
-	`context`
-	`net/http`
-	`time`
-	
-	`github.com/google/gopacket`
-	`github.com/google/gopacket/layers`
-	`github.com/google/gopacket/pcap`
-	`github.com/google/gopacket/tcpassembly`
-	`github.com/pkg/errors`
+	"context"
+	"net/http"
+	"time"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/tcpassembly"
+	"github.com/pkg/errors"
 )
 
 /*
@@ -30,15 +30,54 @@ func newSniffer(cfg Cfg) *sniffer {
 		config:  cfg,
 		factory: &httpStreamFactory{requestChan: make(chan *http.Request)},
 	}
-	
+
 	streamPool := tcpassembly.NewStreamPool(s.factory)
 	s.assembler = tcpassembly.NewAssembler(streamPool)
-	
+
 	return s
 }
+
 func (s *sniffer) AddHandler(handler Handler) error {
 	s.handlers = append(s.handlers, handler)
+
 	return nil
+}
+
+const maxSnapLen = 65536
+
+const timeoutDuration = time.Second * 3
+
+func (s *sniffer) readPackets(
+	ctx context.Context, packets chan gopacket.Packet,
+) {
+	ticker := time.NewTicker(time.Second)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case packet := <-packets:
+			var (
+				tcp         *layers.TCP
+				networkFlow gopacket.Flow
+				err         error
+			)
+
+			// handle vxlan configuration
+			networkFlow, tcp, err = s.handleVXLAN(packet)
+			if tcp == nil || err != nil {
+				continue
+			}
+
+			s.assembler.AssembleWithTimestamp(
+				networkFlow, tcp, packet.Metadata().Timestamp,
+			)
+
+		case <-ticker.C:
+			// Every minute, flush connections that haven't seen activity in the past 2 seconds.
+			s.assembler.FlushOlderThan(time.Now().Add(time.Second * -2))
+		}
+	}
 }
 
 func (s *sniffer) Run(ctx context.Context) error {
@@ -46,31 +85,49 @@ func (s *sniffer) Run(ctx context.Context) error {
 		handle *pcap.Handle
 		err    error
 	)
-	
-	handle, err = pcap.OpenLive(
-		s.config.InterfaceName, 65536, false, time.Second*3,
-	)
+
+	switch s.config.IsLive {
+	case true:
+		handle, err = pcap.OpenLive(
+			s.config.InterfaceName, maxSnapLen, false, timeoutDuration,
+		)
+	case false:
+		handle, err = pcap.OpenOffline(s.config.PcapPath)
+	}
+
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to open packet capture")
 	}
-	
+
 	if err := handle.SetBPFFilter(s.config.Filter); err != nil {
-		return errors.WithMessagef(err, "failed to set bpf filter \"%s\"",s.config.Filter)
+		return errors.WithMessagef(err, "failed to set bpf filter \"%s\"", s.config.Filter)
 	}
-	
+
 	defer handle.Close()
-	
+
 	// Loop through packets
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	packets := packetSource.Packets()
-	
-	go s.sniffInterface(packets, ctx)
-	
+
+	// start collecting packets
+	readCtx, readCancel := context.WithCancel(ctx)
+
+	go func() {
+		s.readPackets(ctx, packets)
+		readCancel()
+	}()
+
 	// start consuming deliveries
+	return s.handleAssembledRequests(readCtx)
+}
+
+func (s *sniffer) handleAssembledRequests(readCtx context.Context) error {
 	for {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-readCtx.Done():
+			return errors.Wrap(readCtx.Err(), "stop handling assembled requests")
+
+		// 	run handlers on packets.
 		case req := <-s.factory.requestChan:
 			for _, handler := range s.handlers {
 				if err := handler(context.Background(), req); err != nil {
@@ -81,56 +138,100 @@ func (s *sniffer) Run(ctx context.Context) error {
 	}
 }
 
-func (s *sniffer) sniffInterface(
-	packets chan gopacket.Packet, ctx context.Context,
+func (s *sniffer) handleVXLAN(packet gopacket.Packet) (
+	gopacket.Flow, *layers.TCP, error,
 ) {
-	
-	ticker := time.Tick(time.Second)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case packet := <-packets:
-			// A nil packet indicates the end of a pcap file.
-			if packet == nil {
-				continue
-			}
-			
-			// check if the packet is OK
-			if packet.NetworkLayer() == nil {
-				continue
-			}
-			if packet.TransportLayer() == nil {
-				continue
-			}
-			
-			var tcp *layers.TCP
-			networkFlow := packet.NetworkLayer().NetworkFlow()
-			
-			// handle vxlan configuration
-			for _, layer := range packet.Layers() {
-				// for vxlan packets, last network layer is the correct one
-				if layer.LayerType() == layers.LayerTypeIPv4 {
-					networkFlow = layer.(*layers.IPv4).NetworkFlow()
-				}
-				
-				// extract tcp layer
-				if layer.LayerType() == layers.LayerTypeTCP {
-					tcp = layer.(*layers.TCP)
-				}
-			}
-			
-			if tcp == nil {
-				continue
-			}
-			
-			s.assembler.AssembleWithTimestamp(
-				networkFlow, tcp, packet.Metadata().Timestamp,
-			)
-		
-		case <-ticker:
-			// Every minute, flush connections that haven't seen activity in the past 2 minutes.
-			s.assembler.FlushOlderThan(time.Now().Add(time.Second * -2))
+	var (
+		tcp         *layers.TCP
+		networkFlow gopacket.Flow
+	)
+
+	// Either packet is nil, or a necessary layer is missing.
+	if err := validatePacket(packet); err != nil {
+		return networkFlow, tcp, err
+	}
+
+	var err error
+	for _, layer := range packet.Layers() {
+		// for vxlan packets, last network layer is the correct one
+		networkFlow, err = checkIPv4Layer(layer)
+		if err != nil {
+			return networkFlow, tcp, err
+		}
+
+		networkFlow, err = checkIPv6Layer(layer)
+		if err != nil {
+			return networkFlow, tcp, err
+		}
+
+		tcp, err = checkTCPLayer(layer)
+		if err != nil {
+			return networkFlow, tcp, err
 		}
 	}
+
+	return networkFlow, tcp, nil
+}
+
+func checkTCPLayer(layer gopacket.Layer) (
+	*layers.TCP, error,
+) {
+	var tcp *layers.TCP
+
+	if layer.LayerType() == layers.LayerTypeTCP {
+		var ok bool
+
+		tcp, ok = layer.(*layers.TCP)
+		if !ok {
+			return tcp, errors.New("TCP layer is not TCP")
+		}
+	}
+
+	return tcp, nil
+}
+
+func checkIPv4Layer(layer gopacket.Layer) (
+	gopacket.Flow, error,
+) {
+	var networkFlow gopacket.Flow
+
+	if layer.LayerType() == layers.LayerTypeIPv4 {
+		var ok bool
+
+		networkFlow = layer.(*layers.IPv4).NetworkFlow()
+		if !ok {
+			return networkFlow, errors.New("IPv4 layer is not a valid network layer")
+		}
+	}
+
+	return networkFlow, nil
+}
+
+func checkIPv6Layer(layer gopacket.Layer) (
+	gopacket.Flow, error,
+) {
+	var networkFlow gopacket.Flow
+
+	if layer.LayerType() == layers.LayerTypeIPv6 {
+		var ok bool
+
+		networkFlow = layer.(*layers.IPv6).NetworkFlow()
+		if !ok {
+			return networkFlow, errors.New("IPv6 layer is not a valid network layer")
+		}
+	}
+
+	return networkFlow, nil
+}
+
+func validatePacket(packet gopacket.Packet) error {
+	if packet == nil {
+		return errors.New("packet is nil")
+	}
+
+	if packet.NetworkLayer() == nil || packet.TransportLayer() == nil {
+		return errors.New("packet is unusable")
+	}
+
+	return nil
 }

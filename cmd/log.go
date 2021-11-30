@@ -17,16 +17,17 @@ limitations under the License.
 */
 
 import (
-	`context`
-	`log`
-	`net/http`
-	
+	"context"
+	"log"
+	"net/http"
+
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	`github.com/spf13/viper`
-	`github.com/strixeyecom/gniffer/api/sniff`
+	"github.com/spf13/viper"
+	"github.com/strixeyecom/gniffer/api/sniff"
 )
 
-// logCmd represents the log command
+// logCmd represents the log command.
 var logCmd = &cobra.Command{
 	Use:   "log",
 	Short: "A brief description of your command",
@@ -37,41 +38,36 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var snifferCfg sniff.Cfg
+		var snifferCfg sniff.ProxyCfg
 		err := viper.Unmarshal(&snifferCfg)
 		if err != nil {
 			return err
 		}
-		sniffer := sniff.New(snifferCfg)
+		sniffer := sniff.New(snifferCfg.Cfg)
 		sniffingCtx, cancelSniffing := context.WithCancel(context.Background())
 		defer cancelSniffing()
-		
+
 		// add logging handler
 		err = sniffer.AddHandler(
 			func(ctx context.Context, req *http.Request) error {
-				log.Printf("%s", req.RequestURI)
+				log.Printf("%s %s", req.RemoteAddr, req.RequestURI)
 				return nil
 			},
 		)
-		
+		if err != nil {
+			return errors.Wrap(err, "failed to add handler")
+		}
+
 		if err := sniffer.Run(sniffingCtx); err != nil {
 			return err
 		}
-		
+
 		return nil
 	},
 }
 
 func init() {
 	sniffCmd.AddCommand(logCmd)
-	
-	// Here you will define your flags and configuration settings.
-	
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// logCmd.PersistentFlags().String("foo", "", "A help for foo")
-	
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// logCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	pcapCmd.AddCommand(logCmd)
+
 }
