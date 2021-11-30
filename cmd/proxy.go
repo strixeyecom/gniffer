@@ -22,6 +22,7 @@ import (
 	`fmt`
 	`io/ioutil`
 	`log`
+	`net`
 	`net/http`
 	
 	"github.com/spf13/cobra"
@@ -63,6 +64,15 @@ without changing the host headers`,
 				// request uri is handled by the client library
 				dupReq.RequestURI = ""
 				
+				// add original client information to x- headers while proxying
+				if proxyCfg.AppendXFF {
+					ip, port, err := net.SplitHostPort(req.RemoteAddr)
+					if err != nil {
+						return err
+					}
+					dupReq.Header.Add("X-Forwarded-For", ip)
+					dupReq.Header.Set("X-Forwarded-Port", port)
+				}
 				// should copy the body because the original request body will be emptied
 				body, err := ioutil.ReadAll(req.Body)
 				if err == nil {
@@ -98,6 +108,12 @@ func init() {
 	// and all subcommands, e.g.:
 	proxyCmd.PersistentFlags().Int("target-port", 80, "target location's port")
 	err := viper.BindPFlag("TARGET_PORT", proxyCmd.PersistentFlags().Lookup("target-port"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	proxyCmd.PersistentFlags().Bool("append-xff", false, "append xff header to the request")
+	err = viper.BindPFlag("APPEND_XFF", proxyCmd.PersistentFlags().Lookup("append-xff"))
 	if err != nil {
 		log.Fatal(err)
 	}

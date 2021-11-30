@@ -52,6 +52,9 @@ type ProxyCfg struct {
 	// 	HTTPFilter supports filtering of http requests. In Cfg, the filter works at the network layer,
 	// 	this is the filter applied to the application layer.
 	HTTPFilter *HTTPFilter `json:"http_filter" mapstructure:"HTTP_FILTER"`
+	// AppendXFF is true if the X-Forwarded-For header should be added to the request. (default: false)
+	// Also overrides X-Forwarded-Port header.
+	AppendXFF bool `json:"append_xff" mapstructure:"APPEND_XFF"`
 }
 
 // 	HTTPFilter supports filtering of http requests. In Cfg, the filter works at the network layer,
