@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/strixeyecom/gniffer/api/sniff"
@@ -91,6 +92,9 @@ without changing the host headers`,
 				return nil
 			},
 		)
+		if err != nil {
+			return errors.Wrap(err, "failed to add handler")
+		}
 
 		fmt.Printf(
 			"proxying %s requests to %s://%s:%s", proxyCfg.Cfg.InterfaceName, proxyCfg.TargetProtocol,

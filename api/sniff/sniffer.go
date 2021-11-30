@@ -13,17 +13,24 @@ import (
 	contains sniffing interface
 */
 
+// Handler is what the sniffer runs on sniffer/read/captured packets after the tcp reassembly process is
+// completed.
 type Handler func(ctx context.Context, req *http.Request) error
 
+// Sniffer should be implemented by structs that wants to use the underlying gniffer logic.
 type Sniffer interface {
 	Run(ctx context.Context) error
 	AddHandler(handler Handler) error
 }
 
+// New is a factory method for creating a new sniffer.
 func New(cfg Cfg) Sniffer {
 	return newSniffer(cfg)
 }
 
+// Cfg is the configuration for the sniffer. It keeps basic information,
+// without referring to the actions that will be taken after the sniffing process is completed such as
+// proxying the request to the destination or logging.
 type Cfg struct {
 	// IsLive is true if the sniffer is running in live mode, meaning it will sniff requests, if false,
 	// it will try to read from a pcap file
@@ -41,6 +48,9 @@ type Cfg struct {
 	PcapPath string `json:"pcap_path" mapstructure:"PCAP_PATH"`
 }
 
+// ProxyCfg is the configuration for the proxy.
+// It both has the Cfg and the more advanced configuration parameters for itself such as the target
+// destination or how the request should be proxied, filtered etc.
 type ProxyCfg struct {
 	// Cfg is the configuration for the gniffer application.
 	Cfg Cfg `json:"cfg" mapstructure:"CFG"`
@@ -61,12 +71,13 @@ type ProxyCfg struct {
 	EnableOriginHeaders bool `json:"enable_origin_headers" mapstructure:"ENABLE_ORIGIN_HEADERS"`
 }
 
-// 	HTTPFilter supports filtering of http requests. In Cfg, the filter works at the network layer,
+// HTTPFilter supports filtering of http requests. In Cfg, the filter works at the network layer,
 // 	this is the filter applied to the application layer.
 type HTTPFilter struct {
 	Hostname string `json:"server_host" mapstructure:"HOSTNAME"`
 }
 
+// Match implements the application layer filtering mechanism similar to the bpf filter in Cfg.
 func (f HTTPFilter) Match(req *http.Request) bool {
 	if f.Hostname != "" && f.Hostname != req.Host {
 		return false
