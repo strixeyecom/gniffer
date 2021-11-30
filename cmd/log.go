@@ -46,11 +46,10 @@ to quickly create a Cobra application.`,
 		sniffingCtx, cancelSniffing := context.WithCancel(context.Background())
 		defer cancelSniffing()
 		
-		// add logging handler`
-		
+		// add logging handler
 		err = sniffer.AddHandler(
 			func(ctx context.Context, req *http.Request) error {
-				log.Printf("%s", req.RequestURI)
+				log.Printf("%s %s", req.RemoteAddr, req.RequestURI)
 				return nil
 			},
 		)
@@ -65,7 +64,7 @@ to quickly create a Cobra application.`,
 
 func init() {
 	sniffCmd.AddCommand(logCmd)
-	
+	pcapCmd.AddCommand(logCmd)
 	// Here you will define your flags and configuration settings.
 	
 	// Cobra supports Persistent Flags which will work for this command

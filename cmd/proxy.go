@@ -119,13 +119,4 @@ func init() {
 		log.Fatal(err)
 	}
 	
-	sniffCmd.PersistentFlags().StringP("interface", "i", "lo", "which interface to sniff")
-	err = viper.BindPFlag("CFG.INTERFACE_NAME", sniffCmd.PersistentFlags().Lookup("interface"))
-	
-	sniffCmd.PersistentFlags().StringP("bpf-filter", "f", "", "custom bpf filter")
-	err = viper.BindPFlag("CFG.FILTER", sniffCmd.PersistentFlags().Lookup("bpf-filter"))
-	if err != nil {
-		panic(err)
-	}
-	
 }
