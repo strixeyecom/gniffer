@@ -36,6 +36,7 @@ func newSniffer(cfg Cfg) *sniffer {
 	
 	return s
 }
+
 func (s *sniffer) AddHandler(handler Handler) error {
 	s.handlers = append(s.handlers, handler)
 	return nil
@@ -47,15 +48,21 @@ func (s *sniffer) Run(ctx context.Context) error {
 		err    error
 	)
 	
-	handle, err = pcap.OpenLive(
-		s.config.InterfaceName, 65536, false, time.Second*3,
-	)
+	switch s.config.IsLive {
+	case true:
+		handle, err = pcap.OpenLive(
+			s.config.InterfaceName, 65536, false, time.Second*3,
+		)
+	case false:
+		handle, err = pcap.OpenOffline(s.config.PcapPath)
+		
+	}
 	if err != nil {
 		return err
 	}
 	
 	if err := handle.SetBPFFilter(s.config.Filter); err != nil {
-		return errors.WithMessagef(err, "failed to set bpf filter \"%s\"",s.config.Filter)
+		return errors.WithMessagef(err, "failed to set bpf filter \"%s\"", s.config.Filter)
 	}
 	
 	defer handle.Close()
@@ -64,13 +71,20 @@ func (s *sniffer) Run(ctx context.Context) error {
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	packets := packetSource.Packets()
 	
-	go s.sniffInterface(packets, ctx)
+	// start collecting packets
+	readCtx, readCancel := context.WithCancel(ctx)
+	go func() {
+		s.readPackets(packets, ctx)
+		readCancel()
+	}()
 	
 	// start consuming deliveries
 	for {
 		select {
-		case <-ctx.Done():
+		case <-readCtx.Done():
 			return ctx.Err()
+		
+		// 	run handlers on packets.
 		case req := <-s.factory.requestChan:
 			for _, handler := range s.handlers {
 				if err := handler(context.Background(), req); err != nil {
@@ -81,7 +95,7 @@ func (s *sniffer) Run(ctx context.Context) error {
 	}
 }
 
-func (s *sniffer) sniffInterface(
+func (s *sniffer) readPackets(
 	packets chan gopacket.Packet, ctx context.Context,
 ) {
 	
@@ -93,7 +107,7 @@ func (s *sniffer) sniffInterface(
 		case packet := <-packets:
 			// A nil packet indicates the end of a pcap file.
 			if packet == nil {
-				continue
+				return
 			}
 			
 			// check if the packet is OK
@@ -129,7 +143,7 @@ func (s *sniffer) sniffInterface(
 			)
 		
 		case <-ticker:
-			// Every minute, flush connections that haven't seen activity in the past 2 minutes.
+			// Every minute, flush connections that haven't seen activity in the past 2 seconds.
 			s.assembler.FlushOlderThan(time.Now().Add(time.Second * -2))
 		}
 	}

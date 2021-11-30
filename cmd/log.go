@@ -37,19 +37,19 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var snifferCfg sniff.Cfg
+		var snifferCfg sniff.ProxyCfg
 		err := viper.Unmarshal(&snifferCfg)
 		if err != nil {
 			return err
 		}
-		sniffer := sniff.New(snifferCfg)
+		sniffer := sniff.New(snifferCfg.Cfg)
 		sniffingCtx, cancelSniffing := context.WithCancel(context.Background())
 		defer cancelSniffing()
 		
 		// add logging handler
 		err = sniffer.AddHandler(
 			func(ctx context.Context, req *http.Request) error {
-				log.Printf("%s", req.RequestURI)
+				log.Printf("%s %s", req.RemoteAddr, req.RequestURI)
 				return nil
 			},
 		)
@@ -64,7 +64,7 @@ to quickly create a Cobra application.`,
 
 func init() {
 	sniffCmd.AddCommand(logCmd)
-	
+	pcapCmd.AddCommand(logCmd)
 	// Here you will define your flags and configuration settings.
 	
 	// Cobra supports Persistent Flags which will work for this command

@@ -54,6 +54,15 @@ func init() {
 	)
 	
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	
+	rootCmd.PersistentFlags().StringP("interface", "i", "lo", "which interface to sniff")
+	err := viper.BindPFlag("CFG.INTERFACE_NAME", rootCmd.PersistentFlags().Lookup("interface"))
+	
+	rootCmd.PersistentFlags().StringP("bpf-filter", "f", "", "custom bpf filter")
+	err = viper.BindPFlag("CFG.FILTER", rootCmd.PersistentFlags().Lookup("bpf-filter"))
+	if err != nil {
+		panic(err)
+	}
 }
 
 // initConfig reads in config file and ENV variables if set.

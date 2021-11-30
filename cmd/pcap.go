@@ -1,5 +1,3 @@
-package cmd
-
 /*
 Copyright © 2021 strixeye keser@strixeye.com
 
@@ -15,15 +13,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+package cmd
 
 import (
 	"github.com/spf13/cobra"
 	`github.com/spf13/viper`
 )
 
-// sniffCmd represents the sniff command
-var sniffCmd = &cobra.Command{
-	Use:   "sniff",
+// pcapCmd represents the pcap command
+var pcapCmd = &cobra.Command{
+	Use:   "pcap",
 	Short: "A brief description of your command",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
@@ -32,18 +31,17 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		viper.Set("CFG.IS_LIVE", true)
+		viper.Set("CFG.IS_LIVE", false)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(sniffCmd)
+	rootCmd.AddCommand(pcapCmd)
 	
-	// Here you will define your flags and configuration settings.
+	pcapCmd.PersistentFlags().String("pcap-path", "", "path to pcap file")
+	err := viper.BindPFlag("CFG.PCAP_PATH", pcapCmd.PersistentFlags().Lookup("pcap-path"))
+	if err != nil {
+		panic(err)
+	}
 	
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// sniffCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

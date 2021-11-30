@@ -22,6 +22,7 @@ import (
 	`fmt`
 	`io/ioutil`
 	`log`
+	`net`
 	`net/http`
 	
 	"github.com/spf13/cobra"
@@ -63,6 +64,15 @@ without changing the host headers`,
 				// request uri is handled by the client library
 				dupReq.RequestURI = ""
 				
+				// add original client information to x- headers while proxying
+				if proxyCfg.AppendXFF {
+					ip, port, err := net.SplitHostPort(req.RemoteAddr)
+					if err != nil {
+						return err
+					}
+					dupReq.Header.Add("X-Forwarded-For", ip)
+					dupReq.Header.Set("X-Forwarded-Port", port)
+				}
 				// should copy the body because the original request body will be emptied
 				body, err := ioutil.ReadAll(req.Body)
 				if err == nil {
@@ -102,6 +112,12 @@ func init() {
 		log.Fatal(err)
 	}
 	
+	proxyCmd.PersistentFlags().Bool("append-xff", false, "append xff header to the request")
+	err = viper.BindPFlag("APPEND_XFF", proxyCmd.PersistentFlags().Lookup("append-xff"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	
 	proxyCmd.PersistentFlags().String("target-host", "localhost", "target location's host")
 	err = viper.BindPFlag("TARGET_HOST", proxyCmd.PersistentFlags().Lookup("target-host"))
 	if err != nil {
@@ -117,15 +133,6 @@ func init() {
 	err = viper.BindPFlag("HTTP_FILTER.HOSTNAME", proxyCmd.PersistentFlags().Lookup("app-filter-hostname"))
 	if err != nil {
 		log.Fatal(err)
-	}
-	
-	sniffCmd.PersistentFlags().StringP("interface", "i", "lo", "which interface to sniff")
-	err = viper.BindPFlag("CFG.INTERFACE_NAME", sniffCmd.PersistentFlags().Lookup("interface"))
-	
-	sniffCmd.PersistentFlags().StringP("bpf-filter", "f", "", "custom bpf filter")
-	err = viper.BindPFlag("CFG.FILTER", sniffCmd.PersistentFlags().Lookup("bpf-filter"))
-	if err != nil {
-		panic(err)
 	}
 	
 }
