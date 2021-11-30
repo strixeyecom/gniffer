@@ -19,16 +19,15 @@ limitations under the License.
 import (
 	"fmt"
 	"os"
-	
-	"github.com/spf13/cobra"
-	
+
 	"github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var cfgFile string
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:   "gniffer",
 	Short: "very simple gopacket wrapper cli",
@@ -48,16 +47,16 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	
+
 	rootCmd.PersistentFlags().StringVar(
 		&cfgFile, "config", "", "config file (default is $HOME/.gniffer.yaml)",
 	)
-	
+
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	
+
 	rootCmd.PersistentFlags().StringP("interface", "i", "lo", "which interface to sniff")
 	err := viper.BindPFlag("CFG.INTERFACE_NAME", rootCmd.PersistentFlags().Lookup("interface"))
-	
+
 	rootCmd.PersistentFlags().StringP("bpf-filter", "f", "", "custom bpf filter")
 	err = viper.BindPFlag("CFG.FILTER", rootCmd.PersistentFlags().Lookup("bpf-filter"))
 	if err != nil {
@@ -74,14 +73,14 @@ func initConfig() {
 		// Find home directory.
 		home, err := homedir.Dir()
 		cobra.CheckErr(err)
-		
+
 		// Search config in home directory with name ".gniffer" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigName(".gniffer")
 	}
-	
+
 	viper.AutomaticEnv() // read in environment variables that match
-	
+
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		_, _ = fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())

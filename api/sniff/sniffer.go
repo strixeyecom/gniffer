@@ -1,8 +1,8 @@
 package sniff
 
 import (
-	`context`
-	`net/http`
+	"context"
+	"net/http"
 )
 
 /*
@@ -14,6 +14,7 @@ import (
 */
 
 type Handler func(ctx context.Context, req *http.Request) error
+
 type Sniffer interface {
 	Run(ctx context.Context) error
 	AddHandler(handler Handler) error
@@ -27,7 +28,7 @@ type Cfg struct {
 	// IsLive is true if the sniffer is running in live mode, meaning it will sniff requests, if false,
 	// it will try to read from a pcap file
 	IsLive bool `json:"is_live" mapstructure:"IS_LIVE"`
-	
+
 	// InterfaceName is the name of the network interface to sniff on. For now,
 	// only single interface per instance is supported.
 	InterfaceName string `json:"interface_name" mapstructure:"INTERFACE_NAME"`
@@ -55,6 +56,9 @@ type ProxyCfg struct {
 	// AppendXFF is true if the X-Forwarded-For header should be added to the request. (default: false)
 	// Also overrides X-Forwarded-Port header.
 	AppendXFF bool `json:"append_xff" mapstructure:"APPEND_XFF"`
+	// EnableOriginHeaders is true if the Gniffer-Connecting-IP /PORT headers should be added to the request.
+	// (default: false)
+	EnableOriginHeaders bool `json:"enable_origin_headers" mapstructure:"ENABLE_ORIGIN_HEADERS"`
 }
 
 // 	HTTPFilter supports filtering of http requests. In Cfg, the filter works at the network layer,
@@ -67,6 +71,6 @@ func (f HTTPFilter) Match(req *http.Request) bool {
 	if f.Hostname != "" && f.Hostname != req.Host {
 		return false
 	}
-	
+
 	return true
 }

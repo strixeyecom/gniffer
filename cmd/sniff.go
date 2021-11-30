@@ -18,10 +18,10 @@ limitations under the License.
 
 import (
 	"github.com/spf13/cobra"
-	`github.com/spf13/viper`
+	"github.com/spf13/viper"
 )
 
-// sniffCmd represents the sniff command
+// sniffCmd represents the sniff command.
 var sniffCmd = &cobra.Command{
 	Use:   "sniff",
 	Short: "A brief description of your command",
@@ -38,9 +38,9 @@ to quickly create a Cobra application.`,
 
 func init() {
 	rootCmd.AddCommand(sniffCmd)
-	
+
 	// Here you will define your flags and configuration settings.
-	
+
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// Cobra supports local flags which will only run when this command
