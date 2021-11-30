@@ -154,17 +154,17 @@ func (s *sniffer) handleVXLAN(packet gopacket.Packet) (
 	var err error
 	for _, layer := range packet.Layers() {
 		// for vxlan packets, last network layer is the correct one
-		networkFlow, err = checkIPv4Layer(layer)
+		networkFlow, err = checkIPv4Layer(layer, networkFlow)
 		if err != nil {
 			return networkFlow, tcp, err
 		}
 
-		networkFlow, err = checkIPv6Layer(layer)
+		networkFlow, err = checkIPv6Layer(layer, networkFlow)
 		if err != nil {
 			return networkFlow, tcp, err
 		}
 
-		tcp, err = checkTCPLayer(layer)
+		tcp, err = checkTCPLayer(layer, tcp)
 		if err != nil {
 			return networkFlow, tcp, err
 		}
@@ -173,14 +173,9 @@ func (s *sniffer) handleVXLAN(packet gopacket.Packet) (
 	return networkFlow, tcp, nil
 }
 
-func checkTCPLayer(layer gopacket.Layer) (
-	*layers.TCP, error,
-) {
-	var tcp *layers.TCP
-
+func checkTCPLayer(layer gopacket.Layer, tcp *layers.TCP) (*layers.TCP, error) {
 	if layer.LayerType() == layers.LayerTypeTCP {
 		var ok bool
-
 		tcp, ok = layer.(*layers.TCP)
 		if !ok {
 			return tcp, errors.New("TCP layer is not TCP")
@@ -190,38 +185,39 @@ func checkTCPLayer(layer gopacket.Layer) (
 	return tcp, nil
 }
 
-func checkIPv4Layer(layer gopacket.Layer) (
-	gopacket.Flow, error,
-) {
-	var networkFlow gopacket.Flow
+func checkIPv4Layer(layer gopacket.Layer, flow gopacket.Flow) (gopacket.Flow, error) {
+	var (
+		ipv4Layer *layers.IPv4
+		ok        bool
+	)
 
 	if layer.LayerType() == layers.LayerTypeIPv4 {
-		var ok bool
-
-		networkFlow = layer.(*layers.IPv4).NetworkFlow()
+		ipv4Layer, ok = layer.(*layers.IPv4)
 		if !ok {
-			return networkFlow, errors.New("IPv4 layer is not a valid network layer")
+			return gopacket.Flow{}, errors.New("IPv4 layer is not a valid network layer")
 		}
+
+		return ipv4Layer.NetworkFlow(), nil
 	}
 
-	return networkFlow, nil
+	return flow, nil
 }
 
-func checkIPv6Layer(layer gopacket.Layer) (
-	gopacket.Flow, error,
-) {
-	var networkFlow gopacket.Flow
+func checkIPv6Layer(layer gopacket.Layer, flow gopacket.Flow) (gopacket.Flow, error) {
+	var ipv6Layer *layers.IPv6
 
 	if layer.LayerType() == layers.LayerTypeIPv6 {
 		var ok bool
 
-		networkFlow = layer.(*layers.IPv6).NetworkFlow()
+		ipv6Layer, ok = layer.(*layers.IPv6)
 		if !ok {
-			return networkFlow, errors.New("IPv6 layer is not a valid network layer")
+			return gopacket.Flow{}, errors.New("IPv6 layer is not a valid network layer")
 		}
+
+		return ipv6Layer.NetworkFlow(), nil
 	}
 
-	return networkFlow, nil
+	return flow, nil
 }
 
 func validatePacket(packet gopacket.Packet) error {
