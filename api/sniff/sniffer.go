@@ -24,6 +24,10 @@ func New(cfg Cfg) Sniffer {
 }
 
 type Cfg struct {
+	// IsLive is true if the sniffer is running in live mode, meaning it will sniff requests, if false,
+	// it will try to read from a pcap file
+	IsLive bool `json:"is_live" mapstructure:"IS_LIVE"`
+	
 	// InterfaceName is the name of the network interface to sniff on. For now,
 	// only single interface per instance is supported.
 	InterfaceName string `json:"interface_name" mapstructure:"INTERFACE_NAME"`
@@ -32,6 +36,8 @@ type Cfg struct {
 	// or filter only requested host and ports on the machine
 	// "tcp and port 80 and host omer.beer
 	Filter string `json:"filter" mapstructure:"FILTER"`
+	// 	PcapPath is the path to the pcap file to write to. It can either be a sniffer or pcap.
+	PcapPath string `json:"pcap_path" mapstructure:"PCAP_PATH"`
 }
 
 type ProxyCfg struct {

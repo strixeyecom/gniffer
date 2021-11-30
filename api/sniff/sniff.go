@@ -36,6 +36,7 @@ func newSniffer(cfg Cfg) *sniffer {
 	
 	return s
 }
+
 func (s *sniffer) AddHandler(handler Handler) error {
 	s.handlers = append(s.handlers, handler)
 	return nil
@@ -47,15 +48,21 @@ func (s *sniffer) Run(ctx context.Context) error {
 		err    error
 	)
 	
-	handle, err = pcap.OpenLive(
-		s.config.InterfaceName, 65536, false, time.Second*3,
-	)
+	switch s.config.IsLive {
+	case true:
+		handle, err = pcap.OpenLive(
+			s.config.InterfaceName, 65536, false, time.Second*3,
+		)
+	case false:
+		handle, err = pcap.OpenOffline(s.config.PcapPath)
+		
+	}
 	if err != nil {
 		return err
 	}
 	
 	if err := handle.SetBPFFilter(s.config.Filter); err != nil {
-		return errors.WithMessagef(err, "failed to set bpf filter \"%s\"",s.config.Filter)
+		return errors.WithMessagef(err, "failed to set bpf filter \"%s\"", s.config.Filter)
 	}
 	
 	defer handle.Close()
