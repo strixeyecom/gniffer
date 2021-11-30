@@ -1,3 +1,5 @@
+package cmd
+
 /*
 Copyright © 2021 strixeye keser@strixeye.com
 
@@ -13,14 +15,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmd
 
 import (
 	"github.com/spf13/cobra"
-	`github.com/spf13/viper`
+	"github.com/spf13/viper"
 )
 
-// pcapCmd represents the pcap command
+// pcapCmd represents the pcap command.
 var pcapCmd = &cobra.Command{
 	Use:   "pcap",
 	Short: "A brief description of your command",
@@ -37,11 +38,10 @@ to quickly create a Cobra application.`,
 
 func init() {
 	rootCmd.AddCommand(pcapCmd)
-	
+
 	pcapCmd.PersistentFlags().String("pcap-path", "", "path to pcap file")
 	err := viper.BindPFlag("CFG.PCAP_PATH", pcapCmd.PersistentFlags().Lookup("pcap-path"))
 	if err != nil {
 		panic(err)
 	}
-	
 }

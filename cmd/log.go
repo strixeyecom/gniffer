@@ -17,16 +17,17 @@ limitations under the License.
 */
 
 import (
-	`context`
-	`log`
-	`net/http`
-	
+	"context"
+	"log"
+	"net/http"
+
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	`github.com/spf13/viper`
-	`github.com/strixeyecom/gniffer/api/sniff`
+	"github.com/spf13/viper"
+	"github.com/strixeyecom/gniffer/api/sniff"
 )
 
-// logCmd represents the log command
+// logCmd represents the log command.
 var logCmd = &cobra.Command{
 	Use:   "log",
 	Short: "A brief description of your command",
@@ -45,7 +46,7 @@ to quickly create a Cobra application.`,
 		sniffer := sniff.New(snifferCfg.Cfg)
 		sniffingCtx, cancelSniffing := context.WithCancel(context.Background())
 		defer cancelSniffing()
-		
+
 		// add logging handler
 		err = sniffer.AddHandler(
 			func(ctx context.Context, req *http.Request) error {
@@ -53,11 +54,14 @@ to quickly create a Cobra application.`,
 				return nil
 			},
 		)
-		
+		if err != nil {
+			return errors.Wrap(err, "failed to add handler")
+		}
+
 		if err := sniffer.Run(sniffingCtx); err != nil {
 			return err
 		}
-		
+
 		return nil
 	},
 }
@@ -65,13 +69,5 @@ to quickly create a Cobra application.`,
 func init() {
 	sniffCmd.AddCommand(logCmd)
 	pcapCmd.AddCommand(logCmd)
-	// Here you will define your flags and configuration settings.
-	
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// logCmd.PersistentFlags().String("foo", "", "A help for foo")
-	
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// logCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
 }

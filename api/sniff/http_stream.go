@@ -1,26 +1,24 @@
 package sniff
 
 import (
-	`bufio`
-	`bytes`
-	`io`
-	`io/ioutil`
-	`log`
-	`net/http`
-	
-	`github.com/google/gopacket`
-	`github.com/google/gopacket/tcpassembly/tcpreader`
+	"bufio"
+	"bytes"
+	"io"
+	"io/ioutil"
+	"log"
+	"net/http"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/tcpassembly/tcpreader"
 )
 
 /*
 	Created by aomerk at 2021-11-23 for project strixeye
 */
-
-
-// global constants for file
+// global constants for file.
 const ()
 
-// global variables (not cool) for this file
+// global variables (not cool) for this file.
 var ()
 
 // httpStream will handleProfiling the actual decoding of http requests.

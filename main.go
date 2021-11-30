@@ -16,7 +16,7 @@ limitations under the License.
 package main
 
 import (
-	`github.com/strixeyecom/gniffer/cmd`
+	"github.com/strixeyecom/gniffer/cmd"
 )
 
 func main() {
