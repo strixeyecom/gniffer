@@ -50,7 +50,7 @@ to quickly create a Cobra application.`,
 		// add logging handler
 		err = sniffer.AddHandler(
 			func(ctx context.Context, req *http.Request) error {
-				log.Printf("%s %s", req.RemoteAddr, req.RequestURI)
+				log.Printf("%s-> %s%s", req.RemoteAddr, req.Host, req.RequestURI)
 				return nil
 			},
 		)

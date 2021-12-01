@@ -2,6 +2,7 @@ package sniff
 
 import (
 	"context"
+	"net"
 	"net/http"
 )
 
@@ -79,7 +80,12 @@ type HTTPFilter struct {
 
 // Match implements the application layer filtering mechanism similar to the bpf filter in Cfg.
 func (f HTTPFilter) Match(req *http.Request) bool {
-	if f.Hostname != "" && f.Hostname != req.Host {
+	host, _, err := net.SplitHostPort(req.Host)
+	if err != nil {
+		return false
+	}
+
+	if f.Hostname != "" && host != f.Hostname {
 		return false
 	}
 
