@@ -24,6 +24,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -48,7 +49,9 @@ without changing the host headers`,
 		sniffingCtx, cancelSniffing := context.WithCancel(context.Background())
 		defer cancelSniffing()
 
-		client := http.Client{}
+		client := http.Client{
+			Timeout: time.Minute,
+		}
 		// add logging handler
 		err = sniffer.AddHandler(
 			func(ctx context.Context, req *http.Request) error {
@@ -84,11 +87,13 @@ without changing the host headers`,
 				if err == nil {
 					dupReq.Body = ioutil.NopCloser(bytes.NewReader(body))
 				}
-
+				req.Header.Set("Connection", "close")
+				req.Close = true
 				_, err = client.Do(dupReq)
 				if err != nil {
 					return err
 				}
+
 				return nil
 			},
 		)
