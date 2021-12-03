@@ -17,6 +17,8 @@ limitations under the License.
 */
 
 import (
+	"log"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,6 +41,12 @@ to quickly create a Cobra application.`,
 func init() {
 	rootCmd.AddCommand(sniffCmd)
 
+	sniffCmd.PersistentFlags().String("app-filter-hostname", "", "which hostnames should be proxied")
+
+	err := viper.BindPFlag("HTTP_FILTER.HOSTNAME", sniffCmd.PersistentFlags().Lookup("app-filter-hostname"))
+	if err != nil {
+		log.Fatal(err)
+	}
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command

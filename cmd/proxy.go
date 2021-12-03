@@ -155,11 +155,4 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	proxyCmd.PersistentFlags().String("app-filter-hostname", "", "which hostnames should be proxied")
-
-	err = viper.BindPFlag("HTTP_FILTER.HOSTNAME", proxyCmd.PersistentFlags().Lookup("app-filter-hostname"))
-	if err != nil {
-		log.Fatal(err)
-	}
 }
