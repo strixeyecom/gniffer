@@ -82,7 +82,7 @@ type HTTPFilter struct {
 func (f HTTPFilter) Match(req *http.Request) bool {
 	host, _, err := net.SplitHostPort(req.Host)
 	if err != nil {
-		return false
+		host = req.Host
 	}
 
 	if f.Hostname != "" && host != f.Hostname {
