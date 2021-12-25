@@ -32,6 +32,30 @@ import (
 	"github.com/strixeyecom/gniffer/api/sniff"
 )
 
+const clientTimeout = 20
+
+func worker(ctx context.Context, c chan *http.Request) {
+	client := http.Client{
+		Timeout: time.Second * clientTimeout,
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case req := <-c:
+			resp, err := client.Do(req)
+			if err != nil {
+				panic(err)
+			}
+
+			_ = resp.Body.Close()
+		}
+	}
+}
+
+const MaxWorkers = 1e3 * 2
+
 // proxyCmd represents the proxy command.
 var proxyCmd = &cobra.Command{
 	Use:   "proxy",
@@ -49,8 +73,9 @@ without changing the host headers`,
 		sniffingCtx, cancelSniffing := context.WithCancel(context.Background())
 		defer cancelSniffing()
 
-		client := http.Client{
-			Timeout: time.Minute,
+		requestChan := make(chan *http.Request)
+		for i := 0; i < MaxWorkers; i++ {
+			go worker(context.TODO(), requestChan)
 		}
 		// add logging handler
 		err = sniffer.AddHandler(
@@ -89,10 +114,7 @@ without changing the host headers`,
 				}
 				req.Header.Set("Connection", "close")
 				req.Close = true
-				_, err = client.Do(dupReq)
-				if err != nil {
-					return err
-				}
+				requestChan <- dupReq
 
 				return nil
 			},
