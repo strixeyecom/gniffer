@@ -24,12 +24,37 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/strixeyecom/gniffer/api/sniff"
 )
+
+const clientTimeout = 20
+
+func worker(ctx context.Context, c chan *http.Request) {
+	client := http.Client{
+		Timeout: time.Second * clientTimeout,
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case req := <-c:
+			resp, err := client.Do(req)
+			if err != nil {
+				panic(err)
+			}
+
+			_ = resp.Body.Close()
+		}
+	}
+}
+
+const MaxWorkers = 1e3 * 2
 
 // proxyCmd represents the proxy command.
 var proxyCmd = &cobra.Command{
@@ -48,7 +73,10 @@ without changing the host headers`,
 		sniffingCtx, cancelSniffing := context.WithCancel(context.Background())
 		defer cancelSniffing()
 
-		client := http.Client{}
+		requestChan := make(chan *http.Request)
+		for i := 0; i < MaxWorkers; i++ {
+			go worker(context.TODO(), requestChan)
+		}
 		// add logging handler
 		err = sniffer.AddHandler(
 			func(ctx context.Context, req *http.Request) error {
@@ -84,11 +112,10 @@ without changing the host headers`,
 				if err == nil {
 					dupReq.Body = ioutil.NopCloser(bytes.NewReader(body))
 				}
+				req.Header.Set("Connection", "close")
+				req.Close = true
+				requestChan <- dupReq
 
-				_, err = client.Do(dupReq)
-				if err != nil {
-					return err
-				}
 				return nil
 			},
 		)
@@ -147,13 +174,6 @@ func init() {
 	proxyCmd.PersistentFlags().String("target-protocol", "http", "target location's protocol")
 
 	err = viper.BindPFlag("TARGET_PROTOCOL", proxyCmd.PersistentFlags().Lookup("target-protocol"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	proxyCmd.PersistentFlags().String("app-filter-hostname", "", "which hostnames should be proxied")
-
-	err = viper.BindPFlag("HTTP_FILTER.HOSTNAME", proxyCmd.PersistentFlags().Lookup("app-filter-hostname"))
 	if err != nil {
 		log.Fatal(err)
 	}
