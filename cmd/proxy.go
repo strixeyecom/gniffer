@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -33,11 +34,19 @@ import (
 )
 
 const clientTimeout = 20
+const MaxWorkers = 1e3 * 2
+const MaxIdleConnectionsPerHost = MaxWorkers
+
+// nolint: gochecknoglobals // because we want all workers to share the same client and using a struct is
+// overkill.
+var client = &http.Client{
+	Transport: &http.Transport{
+		MaxIdleConnsPerHost: MaxIdleConnectionsPerHost,
+	},
+	Timeout: time.Second * clientTimeout,
+}
 
 func worker(ctx context.Context, c chan *http.Request) {
-	client := http.Client{
-		Timeout: time.Second * clientTimeout,
-	}
 
 	for {
 		select {
@@ -49,12 +58,15 @@ func worker(ctx context.Context, c chan *http.Request) {
 				panic(err)
 			}
 
-			_ = resp.Body.Close()
+			_, _ = io.Copy(ioutil.Discard, resp.Body)
+
+			err = resp.Body.Close()
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 }
-
-const MaxWorkers = 1e3 * 2
 
 // proxyCmd represents the proxy command.
 var proxyCmd = &cobra.Command{
