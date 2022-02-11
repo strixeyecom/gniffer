@@ -125,7 +125,7 @@ func (s *sniffer) handleAssembledRequests(readCtx context.Context) error {
 	for {
 		select {
 		case <-readCtx.Done():
-			return errors.Wrap(readCtx.Err(), "stop handling assembled requests")
+			return nil
 
 		// 	run handlers on packets.
 		case req := <-s.factory.requestChan:
