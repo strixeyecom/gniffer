@@ -19,7 +19,6 @@ limitations under the License.
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -30,7 +29,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/strixeyecom/gniffer/api/sniff"
+	"github.com/strixeyecom/gniffer/pkg/sniff"
 )
 
 const clientTimeout = 20
@@ -81,72 +80,93 @@ without changing the host headers`,
 			return err
 		}
 
-		sniffer := sniff.New(proxyCfg.Cfg)
 		sniffingCtx, cancelSniffing := context.WithCancel(context.Background())
 		defer cancelSniffing()
-
-		requestChan := make(chan *http.Request)
-		for i := 0; i < MaxWorkers; i++ {
-			go worker(context.TODO(), requestChan)
-		}
-		// add logging handler
-		err = sniffer.AddHandler(
-			func(ctx context.Context, req *http.Request) error {
-				if proxyCfg.HTTPFilter != nil {
-					if !proxyCfg.HTTPFilter.Match(req) {
-						return nil
-					}
-				}
-
-				dupReq := req.Clone(ctx)
-				// modify request so that it goes to the target server but still has the original headers
-				dupReq.URL.Scheme = proxyCfg.TargetProtocol
-				dupReq.URL.Host = proxyCfg.TargetHost + ":" + proxyCfg.TargetPort
-				// request uri is handled by the client library
-				dupReq.RequestURI = ""
-
-				// add original client information to x- headers while proxying
-				ip, port, err := net.SplitHostPort(req.RemoteAddr)
-				if proxyCfg.AppendXFF {
-					if err != nil {
-						return err
-					}
-					dupReq.Header.Add("X-Forwarded-For", ip)
-					dupReq.Header.Set("X-Forwarded-Port", port)
-				}
-
-				if proxyCfg.EnableOriginHeaders {
-					dupReq.Header.Set("Gniffer-Connecting-Ip", ip)
-					dupReq.Header.Set("Gniffer-Connecting-Port", port)
-				}
-				// should copy the body because the original request body will be emptied
-				body, err := ioutil.ReadAll(req.Body)
-				if err == nil {
-					dupReq.Body = ioutil.NopCloser(bytes.NewReader(body))
-				}
-				req.Header.Set("Connection", "close")
-				req.Close = true
-				requestChan <- dupReq
-
-				return nil
-			},
-		)
+		err = RunProxy(sniffingCtx, &proxyCfg)
 		if err != nil {
 			return errors.Wrap(err, "failed to add handler")
 		}
 
-		fmt.Printf(
-			"proxying %s requests to %s://%s:%s", proxyCfg.Cfg.InterfaceName, proxyCfg.TargetProtocol,
-			proxyCfg.TargetHost,
-			proxyCfg.TargetPort,
-		)
+		return nil
+	},
+}
 
-		if err := sniffer.Run(sniffingCtx); err != nil {
+func RunProxy(ctx context.Context, proxyCfg *sniff.ProxyCfg) error {
+	if proxyCfg.TargetPort == "" {
+		return errors.New("target port is required")
+	}
+
+	sniffer := sniff.New(proxyCfg.Cfg)
+
+	requestChan := make(chan *http.Request)
+	for i := 0; i < MaxWorkers; i++ {
+		go worker(ctx, requestChan)
+	}
+	// add logging handler
+	err := sniffer.AddHandler(
+		func(ctx context.Context, req *http.Request) error {
+			return handlerFunc(ctx, req, proxyCfg, requestChan)
+		},
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to add handler")
+	}
+
+	log.Printf(
+		"proxying %s %s requests to %s://%s:%s", proxyCfg.Cfg.InterfaceName,
+		proxyCfg.HTTPFilter.Hostname, proxyCfg.TargetProtocol,
+		proxyCfg.TargetHost, proxyCfg.TargetPort,
+	)
+
+	if err := sniffer.Run(ctx); err != nil {
+		return errors.Wrap(err, "can not run sniffer")
+	}
+
+	return nil
+}
+
+func handlerFunc(
+	ctx context.Context, req *http.Request, proxyCfg *sniff.ProxyCfg, requestChan chan *http.Request,
+) error {
+	if proxyCfg.HTTPFilter != nil {
+		if !proxyCfg.HTTPFilter.Match(req) {
+			return nil
+		}
+	}
+
+	dupReq := req.Clone(ctx)
+	// modify request so that it goes to the target server but still has the original headers
+	dupReq.URL.Scheme = proxyCfg.TargetProtocol
+	dupReq.URL.Host = proxyCfg.TargetHost + ":" + proxyCfg.TargetPort
+	// request uri is handled by the client library
+	dupReq.RequestURI = ""
+
+	// add original client information to x- headers while proxying
+	ip, port, err := net.SplitHostPort(req.RemoteAddr)
+	if proxyCfg.AppendXFF {
+		if err != nil {
 			return err
 		}
 
-		return nil
-	},
+		dupReq.Header.Add("X-Forwarded-For", ip)
+		dupReq.Header.Set("X-Forwarded-Port", port)
+	}
+
+	if proxyCfg.EnableOriginHeaders {
+		dupReq.Header.Set("Gniffer-Connecting-Ip", ip)
+		dupReq.Header.Set("Gniffer-Connecting-Port", port)
+	}
+	// should copy the body because the original request body will be emptied
+	body, err := ioutil.ReadAll(req.Body)
+	if err == nil {
+		dupReq.Body = ioutil.NopCloser(bytes.NewReader(body))
+	}
+
+	req.Header.Set("Connection", "close")
+	req.Close = true
+	requestChan <- dupReq
+
+	return nil
 }
 
 func init() {
