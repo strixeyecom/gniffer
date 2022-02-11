@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/strixeyecom/gniffer/api/sniff"
+	"github.com/strixeyecom/gniffer/pkg/sniff"
 )
 
 // logCmd represents the log command.

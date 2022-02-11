@@ -18,9 +18,6 @@ import (
 // global constants for file.
 const ()
 
-// global variables (not cool) for this file.
-var ()
-
 // httpStream will handleProfiling the actual decoding of http requests.
 type httpStream struct {
 	net, transport gopacket.Flow
